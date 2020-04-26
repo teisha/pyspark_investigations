@@ -1,0 +1,148 @@
+# VSCode runs this to create the container:
+# docker build -f c:\Users\laima\git\pyspark_investigations\.devcontainer\Dockerfile -t vsc-pyspark_investigations-1e4aecc11da0bcd73e42f74642895bb2 --build-arg VARIANT=3.7 c:\Users\laima\git\pyspark_investigations
+
+
+# For more information, please refer to https://aka.ms/vscode-docker-python
+FROM python:3.8
+#FROM jupyter/pyspark-notebook
+# Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE 1
+# Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED 1
+
+RUN pwd
+RUN ls
+RUN echo %USER%
+USER root
+# Install pip requirements
+RUN pip freeze > requirements.txt
+COPY requirements.txt /
+RUN pip install -r /requirements.txt
+
+
+ENV PATH=/root/.local/bin:$PATH
+RUN pip install awscli --upgrade
+
+RUN date
+# Was getting expiry time errors on the update packages
+# Fix #1: change Ubuntu to interpret the time as local time by running the following command:
+# RUN apt-get install systemd \
+#     && timedatectl set-local-rtc 1
+#Fix #3: set linux clock to windows system time
+# I used to have this problem with Docker for Windows. Whenever the machine hibernated, when it came back I had to go to Hyper-v Manager and disable and reenable Time sync, than it would be back to regular time.
+# I'm pretty sure this is the same problem, it is happening to me in exactly the same pattern: whenever the computer hibernates. I'm on WSL 2.
+# I can confirm that sudo hwclock -s fixes it, but this should come in the box.
+# This did not happen before when this wsl instance was on WSL 1.
+# RUN hwclock --hctosys 
+# Fix# 2:
+# https://github.com/microsoft/WSL/issues/4114 
+# Temporary work-around
+RUN apt-get -o Acquire::Check-Valid-Until=false -o Acquire::Check-Date=false update \
+    && apt-get update  \
+    && apt-get install tree
+
+
+
+WORKDIR /app
+ADD . /app
+
+
+
+
+
+# Install aws cli
+# Install OpenJDK-8
+RUN apt-get install software-properties-common
+RUN apt-get update && \
+    add-apt-repository ppa:openjdk-r/ppa
+RUN apt-get install -y openjdk-8-jdk && \
+    apt-get install -y ant && \
+    apt-get clean;
+
+# # Fix certificate issues
+RUN apt-get update && \
+    apt-get install ca-certificates-java && \
+    apt-get clean && \
+    update-ca-certificates -f;
+
+# # Setup JAVA_HOME -- useful for docker commandline
+ENV JAVA_HOME /usr/lib/jvm/java-8-openjdk-amd64/
+RUN export JAVA_HOME
+
+RUN pip install pyspark
+
+
+
+
+
+#RUN useradd -m docker && echo "docker:docker" | chpasswd && adduser docker sudo
+#USER docker
+#CMD /bin/bash
+
+#-------------------------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See https://go.microsoft.com/fwlink/?linkid=2090316 for license information.
+#-------------------------------------------------------------------------------------------------------------
+
+# To fully customize the contents of this image, use the following Dockerfile instead:
+# https://github.com/microsoft/vscode-dev-containers/tree/v0.112.0/containers/javascript-node-12/.devcontainer/Dockerfile
+#FROM mcr.microsoft.com/vscode/devcontainers/javascript-node:0-12
+
+# The image referenced above includes a non-root user with sudo access. Add
+# the "remoteUser" property to devcontainer.json to use it. On Linux, the container
+# user's GID/UIDs will be updated to match your local UID/GID when using the image
+# or dockerFile property. Update USER_UID/USER_GID below if you are using the
+# dockerComposeFile property or want the image itself to start with different ID
+# values. See https://aka.ms/vscode-remote/containers/non-root-user for details.
+ENV APPUSER=ec2-user
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+# # ARG USERNAME=${APPUSER}
+ARG USERNAME=$NB_UID
+
+RUN groupadd --gid $USER_GID $USERNAME \
+    && useradd --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && chown -R ${APPUSER} /app  
+#     # # && echo "${APPUSER}:${APPUSER}" | chpasswd && adduser ${APPUSER} sudo
+#         # [Optional] Add sudo support. Omit if you don't need to install software after connecting.
+RUN apt-get update \
+    && apt-get install -y sudo \
+    && echo $USERNAME ALL=\(root\) NOPASSWD:ALL >> /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+VOLUME /home/$USERNAME/work
+RUN chown 1000 /home/$USERNAME/work
+
+# # [Optional] Update UID/GID if needed
+RUN if [ "$USER_GID" != "1000" ] || [ "$USER_UID" != "1000" ]; then \
+       groupmod --gid $USER_GID $USERNAME \
+       && usermod --uid $USER_UID --gid $USER_GID $USERNAME \
+       && chown -R $USER_UID:$USER_GID /home/$USERNAME; \
+   fi
+
+RUN chown -R $USERNAME /app 
+RUN mkdir -p /home/$USERNAME/.vscode-server/extensions \
+        /home/$USERNAME/.vscode-server-insiders/extensions \
+    && chown -R $USERNAME \
+        /home/$USERNAME/.vscode-server \
+        /home/$USERNAME/.vscode-server-insiders
+
+# ** [Optional] Uncomment this section to install additional packages. **
+#
+# ENV DEBIAN_FRONTEND=noninteractive
+# RUN apt-get update \
+#    && apt-get -y install --no-install-recommends <your-package-list-here> \
+#    #
+#    # Clean up
+#    && apt-get autoremove -y \
+#    && apt-get clean -y \
+#    && rm -rf /var/lib/apt/lists/*
+# ENV DEBIAN_FRONTEND=dialog
+
+
+
+# Switching to a non-root user, please refer to https://aka.ms/vscode-docker-python-user-rights
+USER $USERNAME
+ENV HOME /home/$USERNAME
+
+# During debugging, this entry point will be overridden. For more information, please refer to https://aka.ms/vscode-docker-python-debug
+CMD ["python", "src/app.py"]
