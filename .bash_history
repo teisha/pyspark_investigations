@@ -12,3 +12,7 @@ ls -lt /usr/local/spark
 env
 ls /opt/conda/bin
 env
+git env
+env
+su jovyan
+su jovyan

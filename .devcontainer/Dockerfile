@@ -114,7 +114,7 @@ CMD ["python", "src/start.py"]
 
 # You should set the following environment variables in $SPARK_HOME/conf/spark-env.sh:
 
-# export PYSPARK_PYTHON=/usr/bin/python3.7
+# export PYSPARK_PYTHON=/usr/bin/python3.7   --- jupyter notebook is using /opt/conda environment: /opt/conda/bin/python3.7
 # export PYSPARK_DRIVER_PYTHON=/usr/bin/python3.7
 
 # export PYSPARK_PYTHON=/usr/local/bin/python3.7;PYSPARK_DRIVER_PYTHON=/usr/local/bin/python3.7;PYTHONUNBUFFERED=1
